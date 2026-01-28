@@ -16,3 +16,16 @@ Projet de Master 1 IA pour hackathon proposé dans ce cadre-là
   - XGBoost (plus avantageux que random forest sur des gros datasets)
   - LSTM (est-ce que facteur constant des flux d'informations)?
   - Transformer temporel #peut être pour booster le modèle vu le nomre de données
+
+
+Lien utile:
+
+Quand utiliser Random Forest:
+https://www.minitab.com/fr-fr/solutions/analytics/statistical-analysis-predictive-analytics/random-forests/#:~:text=Random Forests est le seul,chaque enregistrement a son importance.
+
+
+Pourquoi  utiliser GXBoost:
+https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://translate.google.com/translate?u=https://www.sciencedirect.com/science/article/pii/S1877050925026092&hl=fr&sl=en&tl=fr&client=rq#:~:text=XGBoost%20consistently%20performed%20better%20achieving,particularly%20when%20using%20Pearson%20Correlation.&ved=2ahUKEwjC5ZnAw66SAxWnbKQEHYO3Ob0QFnoECC4QAw&usg=AOvVaw3mgjFK3RQXEXlpTPR9sOAK
+
+Top 5 model d’analyse:
+https://insightsoftware.com/fr/blog/top-5-predictive-analytics-models-and-algorithms/
