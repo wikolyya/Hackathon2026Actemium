@@ -1,5 +1,5 @@
 # Hackathon2026Actemium
-Projet de Master 1 IA pour hackathon proposé dans ce cadre-là
+Projet conjoint entre M1/M2 MAS, M1 IA pour hackathon proposé dans le cadre universitaire
 
 ### Etapes clefs du développement du projet
 1. Exploration des données en liste de dictionnaires
@@ -9,7 +9,7 @@ Projet de Master 1 IA pour hackathon proposé dans ce cadre-là
    - Supprimer si besoin valeurs aberrantes, doublons, anomlies
 
 3. Selection des variables utiles (donc LT notamment)
-4. Baseline : se baser sur le naive bayes pour avoir des valeurs de bases demander des clarifications
+4. Baseline : se baser sur le naive bayes/autre méthode à discuter pour avoir des valeurs de bases demander des clarifications
 5. Test de modèles 
 
   - RANDOM FOREST (avantage quand on a peu d'enregistrement)
