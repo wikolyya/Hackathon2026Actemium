@@ -9,6 +9,7 @@ Projet conjoint entre M1/M2 MAS, M1 IA pour hackathon proposé dans le cadre uni
    - Supprimer si besoin valeurs aberrantes, doublons, anomlies
   
 Ces deux étapes se font par itérations : Schéma optimal :
+
          - Données brutes
          - Exploration (u-ni / bi / ACP/ pénalisation des coeffs)
          - Hypothèses (exemple: quelles données enlever, quelles données influent etc...)
