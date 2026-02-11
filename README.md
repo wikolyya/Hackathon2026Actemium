@@ -10,21 +10,21 @@ Projet conjoint entre M1/M2 MAS, M1 IA pour hackathon proposé dans le cadre uni
   
 Ces deux étapes se font par itérations : Schéma optimal :
          - Données brutes
-         - Nettoyage minimal
-         - Exploration (u-ni / bi / ACP)
-         - Hypothèses métier
-         - Nettoyage informé
-         -  Modélisation
+         - Exploration (u-ni / bi / ACP/ pénalisation des coeffs)
+         - Hypothèses (exemple: quelles données enlever, quelles données influent etc...)
+         - Nettoyage des données en fonction de nos hypothèses
+         - Modélisation
 
-3. Selection des variables utiles (donc LT notamment)
-4. Baseline : se baser sur le naive bayes/autre méthode à discuter pour avoir des valeurs de bases demander des clarifications
-5. Test de modèles 
+3. Baseline : se baser sur le naive bayes/autre méthode à discuter pour avoir des valeurs de bases demander des clarifications
+4. Test de modèles 
 
   - RANDOM FOREST (avantage quand on a peu d'enregistrement)
   - XGBoost (plus avantageux que random forest sur des gros datasets)
   - LSTM (est-ce que facteur constant des flux d'informations)?
   - Transformer temporel #peut être pour booster le modèle vu le nomre de données
 
+## A faire pour la prochaine fois
+à remplir
 
 Lien utile:
 
