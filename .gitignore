@@ -1,0 +1,15 @@
+# Environnement virtuel
+hackathon_venv/
+venv/
+.venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Fichiers VS Code
+.vscode/
+
+# Fichiers système Windows
+Thumbs.db
