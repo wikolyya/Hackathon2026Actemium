@@ -36,9 +36,12 @@ https://www.minitab.com/fr-fr/solutions/analytics/statistical-analysis-predictiv
 Pourquoi  utiliser GXBoost:
 https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://translate.google.com/translate?u=https://www.sciencedirect.com/science/article/pii/S1877050925026092&hl=fr&sl=en&tl=fr&client=rq#:~:text=XGBoost%20consistently%20performed%20better%20achieving,particularly%20when%20using%20Pearson%20Correlation.&ved=2ahUKEwjC5ZnAw66SAxWnbKQEHYO3Ob0QFnoECC4QAw&usg=AOvVaw3mgjFK3RQXEXlpTPR9sOAK
 
+
 Top 5 model d’analyse:
 https://insightsoftware.com/fr/blog/top-5-predictive-analytics-models-and-algorithms/
 
 
 Comparaison GRU / LSTM (++ : gestion des changements brusques) et CNN (pour TCN) / Tansformers (+ : données saisonnières plus fluides) : 
 https://www.preprints.org/manuscript/202601.1962
+
+Transformers (++ beaucoup de variables exogènes) : https://arxiv.org/abs/1912.09363?utm_source=chatgpt.com
