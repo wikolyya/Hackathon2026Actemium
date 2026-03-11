@@ -38,3 +38,7 @@ https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://transl
 
 Top 5 model d’analyse:
 https://insightsoftware.com/fr/blog/top-5-predictive-analytics-models-and-algorithms/
+
+
+Comparaison GRU / LSTM (++ : gestion des changements brusques) et CNN (pour TCN) / Tansformers (+ : données saisonnières plus fluides) : 
+https://www.preprints.org/manuscript/202601.1962
