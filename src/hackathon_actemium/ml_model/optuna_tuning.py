@@ -1,6 +1,8 @@
 import optuna
 import xgboost as xgb
 import sklearn.metrics as metrics
+from config_model import BASE_PARAMS
+
 
 def tune_model(X_train, y_train, X_valid, y_valid):
 
@@ -11,8 +13,8 @@ def tune_model(X_train, y_train, X_valid, y_valid):
 
         params = {
 
-            "objective": "binary:logistic",   # Objectif du modèle (classification binaire)
-            "eval_metric": "logloss",         # Métrique d'évaluation de XGBOOST
+            "objective": "reg:squarederror",   # Objectif du modèle (classification binaire)
+            "eval_metric": "rmse",         # Métrique d'évaluation de XGBOOST
             "tree_method": "hist",            # Méthode d'apprentissage des arbres
 
             # regularisation
@@ -46,11 +48,14 @@ def tune_model(X_train, y_train, X_valid, y_valid):
         preds = (preds > 0.5).astype(int)
 
         # Score
-        score = metrics.accuracy_score(y_valid, preds)
-
+        score = -metrics.root_mean_squared_error(y_valid, preds)  # on maximise le négatif du RMSE
         return score
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=4)
+    from config_model import BASE_PARAMS
 
-    return study.best_params 
+    best_params = study.best_params
+    best_params.update(BASE_PARAMS)
+
+    return best_params
