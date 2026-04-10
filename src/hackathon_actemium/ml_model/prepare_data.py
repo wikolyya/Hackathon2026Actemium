@@ -4,10 +4,13 @@ import pandas as pd
 
 # A COMPLETER/MODIFIER pour adater à la target
 def load_dataset(df, TARGET):
-    """_summary_
-
+    """
+    Charge le dataset et effectue les splits train/validation/test.
     Args:
-        TARGET (_type_): _description_
+        df (pd.DataFrame): DataFrame contenant les données brutes ou netoyées.
+        TARGET (str): Nom de la colonne cible.
+    Returns:
+        tuple: Données d'entraînement, de validation et de test.
     """
 
     X = df.drop(columns=[TARGET, "Date", "Time"])
