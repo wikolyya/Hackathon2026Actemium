@@ -15,22 +15,17 @@ def main():
     df = pd.read_csv(DATA_PATH)
     X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset(df, TARGET)
 
-    print(y_train.unique())
-
     # On tune
     if FORCE_TUNING or not Path(PARAM_PATH).exists():
         print("Tuning...")
         best_params = tune_model(X_train, y_train, X_valid, y_valid)
+        print("Saving best params...")
         save_params(best_params, PARAM_PATH)
     else:
         print("Loading best params...")
         best_params = load_params(PARAM_PATH)
 
-    # On enregistre les paramètres finaux
-    print("Saving best params...")
-    save_params(best_params, PARAM_PATH)
-
-    print("Params utilisés :")
+    print("Used params :")
     print(best_params)
 
     # On entraine

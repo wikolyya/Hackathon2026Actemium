@@ -12,6 +12,12 @@ import seaborn as sns
 def evaluate_model(model, X_test, y_test):
     """
     Fonction évaluant le modèle
+        Args:
+        model (xgb.Booster): Modèle entraîné.
+        X_test (pd.DataFrame): Données de test.
+        y_test (pd.Series): Cibles de test.
+    Returns:
+        dict: Dictionnaire contenant les métriques d'évaluation.
     """
 
     dtest = xgb.DMatrix(X_test)         # Conversion des données de test en format DMatrix
