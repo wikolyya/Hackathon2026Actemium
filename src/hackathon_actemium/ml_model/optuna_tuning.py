@@ -69,7 +69,7 @@ def tune_model(X_train, y_train, X_valid, y_valid):
         return score
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=4)
+    study.optimize(objective, n_trials=15)
 
     best_params = study.best_params
     best_params.update(BASE_PARAMS)

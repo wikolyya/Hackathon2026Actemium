@@ -3,23 +3,8 @@ import pandas as pd
 
 # WADI est une dataset temporelle, dans la préparation de mes données, il faut donc que je gère le côté temporel
 
-def build_datetime(df: pd.DataFrame):
-    """
-    Fusionne les colonnes "Date" et "Time" pour créer une colonne "datetime" au format datetime.
-    Args:
-        df (pd.DataFrame): DataFrame contenant les colonnes "Date" et "Time".
-    Returns:
-        df: DataFrame avec la colonne "datetime" au format datetime.
-    """
-
-    df["datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"],
-                                    format="%Y-%m-%d %H:%M:%S")
-    
-    df = df.sort_values("datetime").reset_index(drop=True) # Tri par ordre chronologique et réinitialisation de l'index 
-    df = df.set_index("datetime") # Mise en place de la colonne datetime comme index du DataFrame
-
-
-    return df
+# TODO : revoir si on fait la fonction build_datetime, mais impossible pour le moment 
+# de gérer sans nettoyage des données.
 
 def add_temporal_features(df: pd.DataFrame, target: str) -> pd.DataFrame:
     """
@@ -65,13 +50,23 @@ def temporal_split(df: pd.DataFrame):
     df_valid = df.iloc[train_end:val_end]
     df_test = df.iloc[val_end:]
 
+    # Vérification des tailles des ensembles et de leur ordre temporel
+    print(f"Train  : {len(df_train):>7} lignes  (rows {df_train.index[0]} -> {df_train.index[-1]})")
+    print(f"Valid  : {len(df_valid):>7} lignes  (rows {df_valid.index[0]} -> {df_valid.index[-1]})")
+    print(f"Test   : {len(df_test):>7} lignes  (rows {df_test.index[0]}  -> {df_test.index[-1]})")
+
     return df_train, df_valid, df_test
 
 
 
 def load_dataset(df:pd.DataFrame, target:str):
     """
-    Parsing datetime, feature temporelles et split chronologiques au complet
+    feature temporelles et split chronologiques au complet
+
+    Note: pour le moment les colonnes Date et Time sont supprimées car valeurs invalides (style 25.00...)
+    Ce sera à corriger par l'équipe data. 
+    Oon utilise la colonne ROw comme index temporel, elle est fiable et ordonnée, contrairement à Date et Time.
+
     Args:
         df (pd.DataFrame): DataFrame contenant les données à préparer.
         target (str): Nom de la colonne cible.
@@ -79,28 +74,35 @@ def load_dataset(df:pd.DataFrame, target:str):
         tuple: Données d'entraînement, de validation et de test prêtes à être utilisées
     """
 
-    # Construction index datetime et tri chronologique
-    df = build_datetime(df)
-    df = df.drop(columns=["Row", "Date", "Time"], errors="ignore") # on n'a plus besoin de ces colonnes, on les drop pour alléger le DataFrame
-    
-    # Ajout des features temporelles
+    # 1)Tri chronologique par Row et suppression des colonnes inutilisables
+    df = df.sort_values("Row").reset_index(drop=True)
+    df = df.drop(columns=["Date", "Time"], errors="ignore")
+    df = df.set_index("Row")
+ 
+    # 2)Ajout des features temporelles
     df = add_temporal_features(df, target)
-    
-    # Suppression des Nan Induits par els lags 
+ 
+    # 3)Suppression des NaN introduits uniquement par les lags
+    #    (pas les NaN du dataset original -> boulot de l'équipe data)
+    lag_cols = [c for c in df.columns if "_lag_" in c or "_rolling_" in c]
     n_before = len(df)
-    df = df.dropna()
-    print(f"Suppression des NaN induits par les lags : {n_before - len(df)} lignes supprimées, soit {100*(n_before - len(df))/n_before:.2f}% du dataset")
-
-    # Split temporel
+    df = df.dropna(subset=lag_cols)
+    print(f"Lignes supprimées (NaN liés aux lags) : {n_before - len(df)}")
+ 
+    # 4) Split temporel
     df_train, df_valid, df_test = temporal_split(df)
-
-    # Séparation features/cibles
-    X_train, y_train = df_train.drop(columns=[target]), df_train[target]
-    X_valid, y_valid = df_valid.drop(columns=[target]), df_valid[target]
-    X_test, y_test = df_test.drop(columns=[target]), df_test[target]
-
-    return X_train, y_train, X_valid, y_valid, X_test, y_test
-
+ 
+    # 5) Séparation features / cible
+    X_train = df_train.drop(columns=[target])
+    y_train = df_train[target]
+ 
+    X_valid = df_valid.drop(columns=[target])
+    y_valid = df_valid[target]
+ 
+    X_test  = df_test.drop(columns=[target])
+    y_test  = df_test[target]
+ 
+    return X_train, X_valid, X_test, y_train, y_valid, y_test
 
 
     
