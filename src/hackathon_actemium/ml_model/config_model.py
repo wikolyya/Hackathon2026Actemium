@@ -1,19 +1,11 @@
 # ------------- Séparation des données ------- # 
-#TRAIN_SPLIT = 0.7
-#TEST_SIZE = 0.15
-#VAL_SPLIT = 0.15
-# A voir si on les utilise
-
-FIRST_SPLIT = 0.3
-FINAL_SPLIT = 0.5
-
+TRAIN_SPLIT = 0.7
+VAL_SPLIT = 0.15
 
 # -------------- Gestion du hasard ------------ #
 RANDOM_STATE = 42
 
-
 # -------------- TARGET pour le moment ----------- #
-## TODO : a supprimer et à remettre dans un autre fichier
 TARGET = "1_LT_001_PV"
 DATA_PATH = "hackathon_actemium/WADI_14days_new.csv"
 
@@ -29,3 +21,8 @@ PARAM_PATH = "artefacts/best_params.json"
 METRICS_PATH = "artefacts/metrics.json"
 
 FORCE_TUNING = False # False car on réutilise les best_params.json si existant
+
+# Paramètres pour les features temporelles
+
+LAG_STEPS = [1, 5, 10, 30, 60]           #lags en secondes
+ROLLING_WINDOWS = [10, 30, 60]          #fenêtres glissantes en secondes     
