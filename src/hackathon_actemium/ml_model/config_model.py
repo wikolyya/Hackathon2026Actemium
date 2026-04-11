@@ -1,3 +1,5 @@
+from pathlib import Path
+
 # ------------- Séparation des données ------- # 
 TRAIN_SPLIT = 0.7
 VAL_SPLIT = 0.15
@@ -7,7 +9,8 @@ RANDOM_STATE = 42
 
 # -------------- TARGET pour le moment ----------- #
 TARGET = "1_LT_001_PV"
-DATA_PATH = "hackathon_actemium/WADI_14days_new.csv"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_PATH = BASE_DIR / "WADI_14days_new.csv"
 
 # Paramètres fixes à toujours injecter (non tunés par Optuna)
 BASE_PARAMS = {
