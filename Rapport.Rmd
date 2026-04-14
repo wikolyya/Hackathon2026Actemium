@@ -1,0 +1,238 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Hackathon 2026 : ACTEMIUM **TO DO: remplir une entête** \## Import des librairies
+
+```{r}
+# Packages
+install.packages(c("tidyverse","janitor","skimr","lubridate","hms","factoextra"))
+library(tidyverse)  # dplyr, tidyr, ggplot2, readr
+library(janitor)    # clean_names(), tabyl(), gestion 
+library(skimr)      # aperçu descriptif rapide
+library(lubridate)  # gestion dates/temps 
+library(hms)        # heures types hms
+library(factoextra) # visualisation des clusters / PCA
+
+#--- A voir si utiliser ici ---#
+#library(caret)      # modélisation
+#library(cluster)    # clustering
+
+```
+
+```{r}
+
+
+```
+
+## Préparation de l'environnement
+
+```{r}
+#Gestion du hasard
+set.seed(123)
+```
+
+## Importation de la dataset
+
+```{r}
+base = read.csv("WADI_14days_new.csv", header=TRUE)
+
+#Copie des données 
+data <- base
+```
+
+## Exploration rapide de notre base
+
+Nous commençons par une exploration globale du jeu de données afin d’en avoir une première vision.
+
+```{r}
+
+#TODO : discuter d'un renommage des variables
+# STructure et aperçu
+str(data)
+head(data)
+
+# Statistiques globales
+summary(data)
+
+# Exploraition plus détaillée
+skim(data)
+
+#Valeurs manquantes par colonnes
+colSums(is.na(data))
+
+```
+
+Certaines colonnes contiennent uniquement des valeurs 100% NA, donc des valeurs manquantes. La base de données est de type **SCADA**, donc données en temps réel, ce qui pourrait impliquer des conversions de types ainsi qu'une reconstruction de la dimension temporelle.
+
+Rappel des variables étudiées :
+
+-   AIT : qualité de l’eau
+
+-   FIT : débit entrant/sortant des réservoirs
+
+-   LT : mesure des niveaux **Notre but à prédire**
+
+-   PIT / SPIT : pression
+
+## Exploration détaillée des données
+
+-   Prochaine étape : **Analyse univariée**
+
+```{r}
+# Discuter de quelles valeurs afficher mais je vais faire un premier exemple
+
+univ_var <- data %>%
+  select(contains("AIT")) %>%
+  select(where(is.numeric)) %>%
+  names()
+
+#Affichage des stats individuelles
+for (v in univ_var) {
+  cat("\n=== Variable :", v, "===\n")
+  print(summary(data[v]))
+  
+  #Histogramme
+  hist(data[[v]],
+       main = paste("HIstogramme de :", v),
+       xlab = v,
+       col="lightblue"
+       )
+  #BoxPlot
+  boxplot(data[[v]],
+        main = paste("Boxplot de", v),
+        horizontal = TRUE,
+        col = "lightgreen")
+}
+
+```
+
+-   **Analyse bivariée**
+
+```{r}
+# Premier aperçu, analyse bivariée, corrélation
+
+library(corrplot)
+
+num_data <- data %>% select(where(is.numeric))
+
+cor_mat <- cor(num_data, use = "pairwise.complete.obs")
+
+cor_long <- as.data.frame(cor_mat) %>%
+  rownames_to_column("var1") %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "cor") %>%
+  filter(var1 < var2, abs(cor) > 0.95) %>%   # seuil simple
+  arrange(desc(abs(cor)))
+
+head(cor_long, 20)
+
+```
+
+POur être sûre de quelles variables vont être filtrées, je décide de réaliser un ACP :
+
+```{r}
+# == Selection des variables quantitatives pour l'ACP ==
+
+numeric_acp <- data%>%
+  select(where(is.numeric))
+
+#Suppression des colonnes sans variances
+numeric_acp <- numeric_acp %>%
+  select(where(~ sd(., na.rm = TRUE) > 0))
+
+#Suppression des lignes incomplètes
+numeric_acp <- numeric_acp %>% na.omit()
+
+# == Centrer et réduire ==
+numeric_scaled <- scale(numeric_acp)
+
+# == Realisation de l'ACP ==
+
+acp_data <- prcomp(numeric_acp, center = TRUE, scale. = TRUE) #Avec standardisation
+
+# == Affichage des statistiques obtenues ==
+summary(acp_data)$importance
+
+
+```
+
+A première vue nous avons\
+PC1 : 20.4 % PC2 : 12.0 % Cumul PC1–PC2 : 32.4 %
+
+PC1–PC4 : \~45.7 % PC1–PC6 : \~53.1 % PC1–PC10 : \~62.8 % Donc pas de dimension dominante, information assez diffuse, ce qui est classique pour une dataset SCADA, plusieurs capteurs viennent apporter un bout d"information.
+
+Affichage des PC :
+
+```{r}
+# Visualisation des PC
+var_explained <- acp_data$sdev^2 / sum(acp_data$sdev^2)
+cum_var <- cumsum(var_explained)
+
+plot(cum_var, type = "b",
+     xlab = "Composantes principales",
+     ylab = "Variance cumulée",
+     main = "Variance cumulée des PC",
+     ylim = c(0,1))  # s'assurer que 0.8 est visible
+
+abline(h = 0.95, col = "blue", lty = 2, lwd = 2)
+
+```
+
+Le scree plot met en évidence une décroissance progressive de la variance expliquée, justifiant la conservation des premières composantes pour l’analyse.
+
+Exploration faite, maintenant nous devons commencer à supprimr des colonnes qui sont très fortement corrélées (nous allonsz prendrfe celles au dessus de 0.95 de corrélation, à peut-être abaisser selon les résultats)
+
+## Nettoyage des données
+
+# (C'est un test)
+
+```{r}
+# ---- Prenettoyage ----- #
+
+# Qualité de l'eau
+data <- data %>%
+  mutate(across(
+    where(is.numeric) & contains("_AIT_"),
+    ~ ifelse(. < 0, NA, .)
+  ))
+
+# LT : Niveau de l'eau (notre cible)
+data <- data%>%
+  mutate(across(
+    where(is.numeric) & contains("_LT_"),
+    ~ ifelse(. < 0, NA, .)
+  ))
+```
+
+```{r}
+
+# Si jamais à rediscuter, risque de perte d'id, code site constant etc... 
+# Suppression des colonnes 100% NA 
+data <- data %>%
+  select(where(~!all(is.na(.))))
+
+# Suppression des colonnes sans variabilité
+data <- data%>%
+  select(where(~n_distinct(.) > 1))
+```
+
+Problème de type de la variable Time, donc j'ai vérifie le format puis convertit dans le bon format
+
+```{r}
+# Conversion Time "MM:SS.s" en secondes numériques
+data <- data %>%
+  mutate(
+    # Extraire minutes et secondes
+    min = as.numeric(substr(Time, 1, 2)),
+    sec = as.numeric(substr(Time, 4, nchar(Time))),
+    time_sec = min*60 + sec
+  ) %>%
+  select(-min, -sec)  # on garde juste la colonne numérique pour le modèle
+
+
+```
+
+La variable Time a été convertie en
+
+\`\`\`
