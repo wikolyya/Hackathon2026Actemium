@@ -1,5 +1,5 @@
 import streamlit as st
-import stats.stats
+from stats import stats
 from stats import analyse_univ 
 from stats import analyse_bivariee
 
@@ -24,7 +24,7 @@ if page == "Accueil":
     - **Analyse** : visualisation interactive
     """)
 elif page == "Stats":
-    stats.stats.app_stats()  # fonction que l’on définira dans stats.py
+    stats.app_stats()  # fonction que l’on définira dans stats.py
 elif page == "Analyse Univariée":
     analyse_univ.app_analyse()  
 elif page == "Analyse bivariée et ACP":
