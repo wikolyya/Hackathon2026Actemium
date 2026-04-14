@@ -3,14 +3,14 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import streamlit as st
-from path import recup_csv
+from path.path import recup_csv
 import os
 import sys
 
 
 def app_analyse():
     # --- Pour éviter l'erreur Unicode sous Windows ---
-    sys.stdout.reconfigure(encoding="utf-8")
+    #sys.stdout.reconfigure(encoding="utf-8") #pas besoin de cette ligne on le fait dans pd.readCSV
 
     st.set_page_config(page_title="WADI Dashboard", layout="wide")
 
@@ -45,7 +45,7 @@ def app_analyse():
 
         # --- Visualisation de la distribution ---
         fig, ax = plt.subplots(figsize=(10, 4))
-        sns.histplot(df[col].dropna(), kde=True, ax=ax)
+        sns.histplot(x=df[col].dropna(), kde=True, ax=ax)
         ax.set_title(f"Distribution de la colonne {col}")
         st.pyplot(fig)
         st.markdown("---")  # Séparateur entre les sections

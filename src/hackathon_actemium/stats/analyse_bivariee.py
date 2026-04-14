@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 def app_analyse_biv():
     # --- Pour éviter l'erreur Unicode sous Windows ---
-    sys.stdout.reconfigure(encoding="utf-8")
+    #sys.stdout.reconfigure(encoding="utf-8") #pas besoin de cette ligne on le fait dans pd.readCSV
 
     st.set_page_config(page_title="WADI Dashboard", layout="wide")
 

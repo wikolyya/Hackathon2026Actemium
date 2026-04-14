@@ -1,5 +1,5 @@
 import streamlit as st
-from path import recup_csv
+from path.path import recup_csv
 from skimpy import skim
 import os
 import sys

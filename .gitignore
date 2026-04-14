@@ -24,3 +24,6 @@ logs/
 temp/
 *.tmp
 *.log
+
+# Ne pas inclure les fichiers csv
+*.csv
