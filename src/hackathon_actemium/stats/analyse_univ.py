@@ -3,7 +3,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import streamlit as st
-from path.path import recup_csv
+from path import path
 import os
 import sys
 
@@ -24,7 +24,7 @@ def app_analyse():
     # ---- Charger les données (caché pour ne pas recharger à chaque interaction) ---
     @st.cache_data
     def load_data():
-        return recup_csv(csv_path)
+        return path.recup_csv(csv_path)
     df = load_data()
 
     # ------- Selection des valeurs nuériques pour les statistiques descriptives -------

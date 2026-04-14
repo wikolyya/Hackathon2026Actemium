@@ -1,12 +1,12 @@
 import streamlit as st
-from path.path import recup_csv
+from path import path
 from skimpy import skim
 import os
 import sys
 
 def app_stats():
     # --- Pour éviter l'erreur Unicode sous Windows ---
-    sys.stdout.reconfigure(encoding="utf-8")
+    #sys.stdout.reconfigure(encoding="utf-8")
 
     st.set_page_config(page_title="WADI Dashboard", layout="wide")
 
@@ -20,7 +20,7 @@ def app_stats():
     # --- Charger les données (caché pour ne pas recharger à chaque interaction) ---
     @st.cache_data
     def load_data():
-        return recup_csv(csv_path)
+        return path.recup_csv(csv_path)
 
     df = load_data()
 

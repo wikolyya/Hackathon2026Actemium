@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
-from stats import recup_csv
+from path import path 
 
 # ----------- POur ACP -----------
 from sklearn.decomposition import PCA
@@ -27,7 +27,7 @@ def app_analyse_biv():
     # --- Charger les données (caché pour ne pas recharger à chaque interaction) ---
     @st.cache_data
     def load_data():
-        return recup_csv(csv_path)
+        return path.recup_csv(csv_path)
 
     df = load_data()
 
