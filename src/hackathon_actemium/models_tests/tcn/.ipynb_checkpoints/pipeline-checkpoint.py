@@ -4,42 +4,114 @@ import tensorflow as tf
 
 class TCNPipeline:
 
-    def __init__(self, model, seq_len, strategy="recursive"):
-        self.model = model
+    def __init__(self, model_builder, seq_len, horizon=1,
+                 use_future_cov=False, strategy="recursive"):
+
+        self.model_builder = model_builder
         self.seq_len = seq_len
+        self.horizon = horizon
+        self.use_future_cov = use_future_cov
         self.strategy = strategy
 
+        self.model = None
+        self.history = None
+
+    # DATASET BUILDER
+    def make_dataset(self, data):
+
+        values = data.values
+
+        X_past, X_future, y = [], [], []
+
+        for i in range(len(values) - self.seq_len - self.horizon):
+
+            past = values[i:i+self.seq_len]
+            target = values[i+self.seq_len:i+self.seq_len+self.horizon, 0]
+
+            if self.use_future_cov:
+                future = values[i+self.seq_len:i+self.seq_len+self.horizon, 1:]
+                X_future.append(future)
+
+            X_past.append(past)
+            y.append(target)
+
+        X_past = np.array(X_past)
+        y = np.array(y)
+
+        if self.use_future_cov:
+            return X_past, np.array(X_future), y
+        else:
+            return X_past, None, y
+
     # FIT
-    def fit(self, X_past, X_future, y,
+    def fit(self, train_df, val_df=None,
             epochs=50, batch_size=32, lr=1e-3):
+
+        X_past, X_future, y = self.make_dataset(train_df)
+
+        if val_df is not None:
+            Xp_val, Xf_val, y_val = self.make_dataset(val_df)
+        else:
+            Xp_val, Xf_val, y_val = None, None, None
+
+        n_past_features = X_past.shape[2]
+        n_future_features = X_future.shape[2] if self.use_future_cov else 0
+
+        self.model = self.model_builder(
+            seq_len=self.seq_len,
+            n_past_features=n_past_features,
+            horizon=self.horizon,
+            n_future_features=n_future_features
+        )
 
         self.model.compile(
             optimizer=tf.keras.optimizers.Adam(lr),
-            loss="mse"
+            loss="mse",
+            metrics=["mae"]
         )
 
-        self.model.fit(
-            [X_past, X_future],
-            y,
+        if self.use_future_cov:
+            train_inputs = [X_past, X_future]
+            val_inputs = ([Xp_val, Xf_val], y_val) if val_df is not None else None
+        else:
+            train_inputs = X_past
+            val_inputs = (Xp_val, y_val) if val_df is not None else None
+
+        self.history = self.model.fit(
+            train_inputs, y,
+            validation_data=val_inputs,
             epochs=epochs,
             batch_size=batch_size,
-            shuffle=False
+            shuffle=False,
+            verbose=0
         )
 
-        return self
+        return self.model, None, self.history
+
 
     # PREDICT
-    def predict(self, X_past, X_future=None, n_steps=10):
+    def predict(self, X_last, future_cov=None, n_steps=10):
 
-        # MODE RECURSIVE
-        if self.strategy == "recursive":
+        if self.strategy == "direct":
+            if self.use_future_cov:
+                return self.model.predict([X_last, future_cov])
+            else:
+                return self.model.predict(X_last)
 
-            X_window = X_past.copy()
+        elif self.strategy == "recursive":
+
+            X_window = X_last.copy()
             preds = []
 
-            for _ in range(n_steps):
+            for i in range(n_steps):
 
-                y = self.model.predict([X_window, X_future], verbose=0)[0, 0]
+                if self.use_future_cov:
+                    y = self.model.predict(
+                        [X_window, future_cov[i:i+1]], verbose=0
+                    )[0, 0]
+                else:
+                    y = self.model.predict(X_window, verbose=0)[0, 0]
+
                 preds.append(y)
 
                 X_window = np.roll(X_window, -1, axis=1)
@@ -47,9 +119,5 @@ class TCNPipeline:
 
             return np.array(preds).reshape(-1, 1)
 
-        # MODE DIRECT
-        elif self.strategy == "direct":
-            return self.model.predict([X_past, X_future])
-
         else:
-            raise ValueError("strategy must be 'recursive' or 'direct'")
+            raise ValueError("la stratégie doit être 'recursive' ou 'direct'")
