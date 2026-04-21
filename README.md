@@ -29,6 +29,11 @@ Ces deux étapes se font par itérations : Schéma optimal :
 
 Lien utile:
 
+Optuna Tuning XGboost : 
+
+https://github.com/optuna/optuna-examples/blob/main/xgboost/xgboost_simple.py
+
+
 Quand utiliser Random Forest:
 https://www.minitab.com/fr-fr/solutions/analytics/statistical-analysis-predictive-analytics/random-forests/#:~:text=Random Forests est le seul,chaque enregistrement a son importance.
 

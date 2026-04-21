@@ -1,7 +1,7 @@
 import streamlit as st
-import stats
-import analyse_univ 
-import analyse_biv
+from stats import stats
+from stats import analyse_univ 
+from stats import analyse_bivariee
 
 st.set_page_config(page_title="Dashboard WADI", layout="wide")
 
@@ -28,7 +28,7 @@ elif page == "Stats":
 elif page == "Analyse Univariée":
     analyse_univ.app_analyse()  
 elif page == "Analyse bivariée et ACP":
-    analyse_biv.app_analyse_biv()  
+    analyse_bivariee.app_analyse_biv()  
 elif page == "XGBOOST":
     st.title("XGBOOST")
     st.write("Contenu à venir...")

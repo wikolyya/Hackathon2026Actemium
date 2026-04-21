@@ -1,19 +1,40 @@
 import optuna
 import xgboost as xgb
 import sklearn.metrics as metrics
+from config_model import BASE_PARAMS
+
 
 def tune_model(X_train, y_train, X_valid, y_valid):
+    """
+    Tune un modèle XGBoost avec Optuna.
+    Args:
+        X_train (pd.DataFrame): Données d'entraînement.
+        y_train (pd.Series): Cibles d'entraînement.
+        X_valid (pd.DataFrame): Données de validation.
+        y_valid (pd.Series): Cibles de validation.
+    Returns:
+        dict: Meilleurs paramètres trouvés par Optuna.
+    """
 
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dvalid = xgb.DMatrix(X_valid, label=y_valid)
 
     def objective(trial):
 
+        """
+        Fonction objectif pour Optuna. Elle entraîne un modèle XGBoost avec les paramètres suggérés par le trial,
+        puis évalue sa performance sur le set de validation.
+        Args:
+            trial (optuna.Trial): Trial Optuna.
+        Returns:
+            float: Score du modèle.
+        """
+
         params = {
 
-            "objective": "binary:logistic",   # Objectif du modèle (classification binaire)
-            "eval_metric": "logloss",         # Métrique d'évaluation de XGBOOST
-            "tree_method": "hist",            # Méthode d'apprentissage des arbres
+            "objective": "reg:squarederror",   # Objectif du modèle (regréssion)
+            "eval_metric": "rmse",             # Métrique d'évaluation de XGBOOST
+            "tree_method": "hist",             # Méthode d'apprentissage des arbres
 
             # regularisation
             "lambda": trial.suggest_float("lambda", 1e-8, 1.0, log=True),           #L2 regularization pour éviter l'overfitting
@@ -43,14 +64,14 @@ def tune_model(X_train, y_train, X_valid, y_valid):
 
         # Prédiction
         preds = model.predict(dvalid)
-        preds = (preds > 0.5).astype(int)
-
         # Score
-        score = metrics.accuracy_score(y_valid, preds)
-
+        score = -metrics.root_mean_squared_error(y_valid, preds)  # on maximise le négatif du RMSE
         return score
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=15)
 
-    return study.best_params 
+    best_params = study.best_params
+    best_params.update(BASE_PARAMS)
+
+    return best_params
