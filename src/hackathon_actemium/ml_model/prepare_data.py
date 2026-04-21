@@ -74,15 +74,15 @@ def load_dataset(df:pd.DataFrame, target:str):
         tuple: Données d'entraînement, de validation et de test prêtes à être utilisées
     """
 
-    # 1)Tri chronologique par Row et suppression des colonnes inutilisables
-    df = df.sort_values("Row").reset_index(drop=True)
-    df = df.drop(columns=["Date", "Time"], errors="ignore")
-    df = df.set_index("Row")
+    # 1) Tri chronologique par Datetime et utilisation comme index
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+    df = df.sort_values("Datetime").reset_index(drop=True)
+    df = df.set_index("Datetime")
  
-    # 2)Ajout des features temporelles
+    # 2) Ajout des features temporelles
     df = add_temporal_features(df, target)
  
-    # 3)Suppression des NaN introduits uniquement par les lags
+    # 3) Suppression des NaN introduits uniquement par les lags
     #    (pas les NaN du dataset original -> boulot de l'équipe data)
     lag_cols = [c for c in df.columns if "_lag_" in c or "_rolling_" in c]
     n_before = len(df)
