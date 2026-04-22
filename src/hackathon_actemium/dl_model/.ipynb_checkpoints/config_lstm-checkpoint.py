@@ -11,3 +11,7 @@ ARCHITECTURES = {
 
 BATCH = 256
 EPOCHS = 50
+VERBOSE = 0
+HORIZON = 12
+
+CONFIG = {"model_type":"lstm"}

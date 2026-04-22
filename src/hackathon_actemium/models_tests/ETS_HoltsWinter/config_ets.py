@@ -1,0 +1,8 @@
+MODEL_TYPE = "ets"
+
+SEASONALITY = 12
+
+TREND = "add"
+SEASONAL = "add"
+
+TYPE_PRODUIT = False

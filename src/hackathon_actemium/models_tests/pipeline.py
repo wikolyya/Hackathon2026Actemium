@@ -1,10 +1,12 @@
 import numpy as np
 import tensorflow as tf
-from .config_tcn import SEQ_LEN, HORIZON, USE_FUTURE_COV, STRATEGY, BATCH_SIZE, LEARNING_RATE, VERBOSE
+
 
 class TCNPipeline:
 
-    def __init__(self, model_builder, seq_len=SEQ_LEN, horizon=HORIZON, use_future_cov=USE_FUTURE_COV, strategy=STRATEGY):
+    def __init__(self, model_builder, seq_len, horizon=1,
+                 use_future_cov=False, strategy="recursive"):
+
         self.model_builder = model_builder
         self.seq_len = seq_len
         self.horizon = horizon
@@ -43,7 +45,7 @@ class TCNPipeline:
 
     # FIT
     def fit(self, train_df, val_df=None,
-            epochs=50, batch_size=BATCH_SIZE, lr=LEARNING_RATE, verbose = VERBOSE):
+            epochs=50, batch_size=32, lr=1e-3):
 
         X_past, X_future, y = self.make_dataset(train_df)
 
@@ -81,7 +83,7 @@ class TCNPipeline:
             epochs=epochs,
             batch_size=batch_size,
             shuffle=False,
-            verbose=VERBOSE
+            verbose=0
         )
 
         return self.model, None, self.history

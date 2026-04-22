@@ -1,0 +1,1 @@
+ARIMA_CONFIG = {"model_type": "stl_arima", "seasonal": True, "saisonalite": 12, "type_produit": False}

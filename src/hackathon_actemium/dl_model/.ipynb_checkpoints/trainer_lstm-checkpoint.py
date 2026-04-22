@@ -5,7 +5,7 @@ import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
-from .config_lstm import ARCHITECTURES, WINDOW_SIZE, BATCH, EPOCHS
+from .config_lstm import ARCHITECTURES, WINDOW_SIZE, BATCH, EPOCHS, VERBOSE, HORIZON
 from .architectures_lstm import build_lstm_model, build_bidirectionnal_lstm, build_gru_lstm
 from .sequences_lstm import prepare_sequences, prepare_sequences_multi
 
@@ -23,7 +23,7 @@ def get_device() -> str:
         print("Aucun GPU détecté. Utilisation du CPU pour l'entraînement.")
         return "CPU"
 
-def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size=256, epochs=50, verbose=1):
+def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size=BATCH, epochs=EPOCHS, verbose=VERBOSE):
     """
     Pipeline complet : normalisation → séquences → entraînement.
  
@@ -56,15 +56,8 @@ def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size
     # 3. Choix modèle
     input_shape = (X_train_seq.shape[1], X_train_seq.shape[2])
 
-    if model_type == "lstm":
-        model = build_lstm_model(input_shape)
-
-    elif model_type == "bidirectional_lstm":
-        model = build_bidirectionnal_lstm(input_shape)
-
-    elif model_type == "gru":
-        model = build_gru_lstm(input_shape)
-
+    if model_type in ARCHITECTURES.keys():
+        model = ARCHITECTURES[model_type](input_shape)
     else:
         raise ValueError(f"Modèle inconnu: {model_type}")
 
@@ -102,7 +95,7 @@ def train_lstm_multistep_direct(
     y_train: pd.Series,
     X_valid: pd.DataFrame,
     y_valid: pd.Series,
-    horizon: int = 12,
+    horizon: int = HORIZON,
     model_type: str = "lstm"
 ):
     scaler = MinMaxScaler(feature_range=(0, 1))
