@@ -28,12 +28,12 @@ def compare_models(results_dict, y_true, baseline_pred=None, plot=True):
         df_metrics : DataFrame comparatif
     """
 
-    y_true = np.array(y_true)
+    y_true_tab = np.array(y_true)
 
     # baseline naïf si non fourni
     if baseline_pred is None:
-        baseline_pred = np.roll(y_true, 1)
-        baseline_pred[0] = y_true[0]
+        baseline_pred = np.roll(y_true_tab, 1)
+        baseline_pred[0] = y_true_tab[0]
 
     results = []
 
@@ -41,9 +41,9 @@ def compare_models(results_dict, y_true, baseline_pred=None, plot=True):
 
         y_pred = np.array(obj["pred"])
 
-        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-        mae = mean_absolute_error(y_true, y_pred)
-        ss = skill_score(y_true, y_pred, baseline_pred)
+        rmse = np.sqrt(mean_squared_error(y_true_tab, y_pred))
+        mae = mean_absolute_error(y_true_tab, y_pred)
+        ss = skill_score(y_true_tab, y_pred, baseline_pred)
 
         results.append({"model": name, "RMSE": rmse, "MAE": mae, "SkillScore": ss})
 

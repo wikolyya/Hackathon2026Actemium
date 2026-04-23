@@ -1,10 +1,11 @@
 import numpy as np
 import tensorflow as tf
 from .config_tcn import SEQ_LEN, HORIZON, USE_FUTURE_COV, STRATEGY, BATCH_SIZE, LEARNING_RATE, VERBOSE
+from .tcn_model import build_tcn
 
 class TCNPipeline:
 
-    def __init__(self, model_builder, seq_len=SEQ_LEN, horizon=HORIZON, use_future_cov=USE_FUTURE_COV, strategy=STRATEGY):
+    def __init__(self, model_builder=build_tcn, seq_len=SEQ_LEN, horizon=HORIZON, use_future_cov=USE_FUTURE_COV, strategy=STRATEGY):
         self.model_builder = model_builder
         self.seq_len = seq_len
         self.horizon = horizon

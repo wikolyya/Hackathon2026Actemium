@@ -121,18 +121,11 @@ def train_lstm_multistep_direct(
 
     input_shape = (X_train_seq.shape[1], X_train_seq.shape[2])
 
-    # modèle (on réutilise tes architectures)
-    if model_type == "lstm":
-        model = build_lstm_model(input_shape)
-
-    elif model_type == "gru":
-        model = build_gru_lstm(input_shape)
-
-    elif model_type == "bidirectional_lstm":
-        model = build_bidirectionnal_lstm(input_shape)
-
+    # modèle (on réutilise les architectures)
+    if model_type in ARCHITECTURES.keys():
+        model = ARCHITECTURES[model_type](input_shape)
     else:
-        raise ValueError("modèle inconnu")
+        raise ValueError(f"Modèle inconnu: {model_type}")
 
     model.layers[-1] = Dense(horizon) # on adapte la sortie au multi-step
 
