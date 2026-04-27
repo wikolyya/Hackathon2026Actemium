@@ -10,7 +10,7 @@ RANDOM_STATE = 42
 # -------------- TARGET pour le moment ----------- #
 TARGET = "1_LT_001_PV"
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_PATH = BASE_DIR / "WADI_14days_new.csv"
+DATA_PATH = BASE_DIR / "WADI_clean.csv"
 
 # Paramètres fixes à toujours injecter (non tunés par Optuna)
 BASE_PARAMS = {

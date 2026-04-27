@@ -11,7 +11,7 @@ def recup_csv(path):
     
     :param path: chemin d'accès à notre fichier csv
     """
-    df = pd.read_csv(path, low_memory=False) # Permet de charger le fichier CSV en ignorant les avertissements liés à la mémoire
+    df = pd.read_csv(path, low_memory=False, encoding="utf-8") # Permet de charger le fichier CSV en ignorant les avertissements liés à la mémoire
     return df
 
 def entete_csv(path, n=5):
