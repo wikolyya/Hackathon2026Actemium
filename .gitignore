@@ -24,3 +24,11 @@ logs/
 temp/
 *.tmp
 *.log
+
+
+# Fichiers de travail personnels (à ignorer)
+Projet_V1.Rmd
+guide_projet.pdf
+
+# Ne pas inclure les fichiers csv
+*.csv
