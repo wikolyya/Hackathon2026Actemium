@@ -1,21 +1,20 @@
 from pipeline import TCNPipeline
 from tcn_model import build_tcn
+from config_tcn import BATCH_SIZE, LEARNING_RATE
 
 
-def trainer_tcn(X_train, y_train, X_valid, y_valid, **params):
+def trainer_tcn(train_df, val_df, target_col, **params):
 
-    # construire dataframe (target + covariables)
-    train_df = X_train.copy()
-    train_df.insert(0, "target", y_train.values)
+    # split X / y internally
+    y_train = train_df[target_col].values
+    X_train = train_df.drop(columns=[target_col])
 
-    val_df = X_valid.copy()
-    val_df.insert(0, "target", y_valid.values)
-
+    y_valid = val_df[target_col].values
+    X_valid = val_df.drop(columns=[target_col])
     pipeline = TCNPipeline(
         model_builder=build_tcn,
         seq_len=params.get("seq_len", 30),
         horizon=params.get("horizon", 1),
-        use_future_cov=params.get("use_future_cov", False),
         strategy=params.get("strategy", "recursive")
     )
 
@@ -23,8 +22,7 @@ def trainer_tcn(X_train, y_train, X_valid, y_valid, **params):
         train_df,
         val_df,
         epochs=params.get("epochs", 50),
-        batch_size=params.get("batch_size", 32),
-        lr=params.get("lr", 1e-3)
+        lr=LEARNING_RATE
     )
 
     return model, scaler, history

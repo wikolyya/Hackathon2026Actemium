@@ -1,122 +1,105 @@
 import numpy as np
 import tensorflow as tf
-from .config_tcn import SEQ_LEN, HORIZON, USE_FUTURE_COV, STRATEGY, BATCH_SIZE, LEARNING_RATE, VERBOSE
-from .tcn_model import build_tcn
+from config_tcn import SEQ_LEN, HORIZON, STRATEGY, BATCH_SIZE, LEARNING_RATE, VERBOSE
+from tcn_model import build_tcn
+
 
 class TCNPipeline:
 
-    def __init__(self, model_builder=build_tcn, seq_len=SEQ_LEN, horizon=HORIZON, use_future_cov=USE_FUTURE_COV, strategy=STRATEGY):
+    def __init__(self,
+                 model_builder=build_tcn,
+                 seq_len=SEQ_LEN,
+                 horizon=HORIZON,
+                 strategy=STRATEGY):
+
         self.model_builder = model_builder
         self.seq_len = seq_len
         self.horizon = horizon
-        self.use_future_cov = use_future_cov
         self.strategy = strategy
+
+        if self.strategy == "recursive" and self.horizon > 1:
+            raise ValueError("recursive strategy supporte uniquement horizon=1")
 
         self.model = None
         self.history = None
 
-    # DATASET BUILDER
+    # DATASET
     def make_dataset(self, data):
-
-        values = data.values
-
-        X_past, X_future, y = [], [], []
-
-        for i in range(len(values) - self.seq_len - self.horizon):
-
-            past = values[i:i+self.seq_len]
-            target = values[i+self.seq_len:i+self.seq_len+self.horizon, 0]
-
-            if self.use_future_cov:
-                future = values[i+self.seq_len:i+self.seq_len+self.horizon, 1:]
-                X_future.append(future)
-
-            X_past.append(past)
-            y.append(target)
-
-        X_past = np.array(X_past)
+        values = data.values.astype(np.float32)
+    
+        X = []
+        y = []
+    
+        for i in range(len(values) - self.seq_len - self.horizon + 1):
+            X.append(values[i:i + self.seq_len])
+            y.append(values[i + self.seq_len:i + self.seq_len + self.horizon, 0])
+    
+        X = np.array(X)
         y = np.array(y)
-
-        if self.use_future_cov:
-            return X_past, np.array(X_future), y
-        else:
-            return X_past, None, y
+    
+        ds = tf.data.Dataset.from_tensor_slices((X, y))
+        ds = ds.batch(BATCH_SIZE)
+    
+        return ds
 
     # FIT
     def fit(self, train_df, val_df=None,
-            epochs=50, batch_size=BATCH_SIZE, lr=LEARNING_RATE, verbose = VERBOSE):
+            epochs=50,
+            lr=LEARNING_RATE,
+            verbose=VERBOSE):
 
-        X_past, X_future, y = self.make_dataset(train_df)
+        # datasets
+        train_ds = self.make_dataset(train_df)
+        val_ds = self.make_dataset(val_df) if val_df is not None else None
 
-        if val_df is not None:
-            Xp_val, Xf_val, y_val = self.make_dataset(val_df)
-        else:
-            Xp_val, Xf_val, y_val = None, None, None
+        # features
+        n_features = train_df.shape[1]
 
-        n_past_features = X_past.shape[2]
-        n_future_features = X_future.shape[2] if self.use_future_cov else 0
-
+        # model
         self.model = self.model_builder(
             seq_len=self.seq_len,
-            n_past_features=n_past_features,
+            n_past_features=n_features,
             horizon=self.horizon,
-            n_future_features=n_future_features
+            n_future_features=0  # future cov supprimé pour stabilité
         )
 
         self.model.compile(
-            optimizer=tf.keras.optimizers.Adam(lr),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
             loss="mse",
             metrics=["mae"]
         )
 
-        if self.use_future_cov:
-            train_inputs = [X_past, X_future]
-            val_inputs = ([Xp_val, Xf_val], y_val) if val_df is not None else None
-        else:
-            train_inputs = X_past
-            val_inputs = (Xp_val, y_val) if val_df is not None else None
-
+        # training
         self.history = self.model.fit(
-            train_inputs, y,
-            validation_data=val_inputs,
+            train_ds,
+            validation_data=val_ds,
             epochs=epochs,
-            batch_size=batch_size,
-            shuffle=False,
-            verbose=VERBOSE
+            verbose=verbose
         )
 
         return self.model, None, self.history
 
-
     # PREDICT
-    def predict(self, X_last, future_cov=None, n_steps=10):
+    def predict(self, X_last, n_steps=10):
 
         if self.strategy == "direct":
-            if self.use_future_cov:
-                return self.model.predict([X_last, future_cov])
-            else:
-                return self.model.predict(X_last)
+            return self.model.predict(X_last)
 
         elif self.strategy == "recursive":
 
             X_window = X_last.copy()
             preds = []
 
-            for i in range(n_steps):
+            for _ in range(n_steps):
 
-                if self.use_future_cov:
-                    y = self.model.predict(
-                        [X_window, future_cov[i:i+1]], verbose=0
-                    )[0, 0]
-                else:
-                    y = self.model.predict(X_window, verbose=0)[0, 0]
-
+                y = self.model.predict(X_window, verbose=0)[0, 0]
                 preds.append(y)
 
+                # shift window
                 X_window = np.roll(X_window, -1, axis=1)
                 X_window[0, -1, 0] = y
 
             return np.array(preds).reshape(-1, 1)
 
         else:
-            raise ValueError("la stratégie doit être 'recursive' ou 'direct'")
+            raise ValueError("strategy doit être 'direct' ou 'recursive'")

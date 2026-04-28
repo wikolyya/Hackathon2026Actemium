@@ -26,7 +26,6 @@ def residual_tcn_block(x, filters, kernel_size, dilation, dropout=0.1):
 
     return x
 
-
 def build_tcn(
     seq_len,
     n_past_features,
@@ -46,7 +45,12 @@ def build_tcn(
             x, ch, kernel_size, dilation=2**i, dropout=dropout
         )
 
+    # 👉 on garde uniquement le dernier timestep
     x = layers.Lambda(lambda t: t[:, -1, :])(x)
+
+    # 👉 petit MLP pour stabiliser (important en multi-step)
+    x = layers.Dense(64, activation="relu")(x)
+    x = layers.Dropout(dropout)(x)
 
     # ===== FUTURE (OPTIONAL) =====
     if n_future_features > 0:
@@ -57,10 +61,12 @@ def build_tcn(
         f = layers.Dense(32, activation="relu")(f)
 
         h = layers.Concatenate()([x, f])
-        outputs = layers.Dense(horizon)(h)
+        h = layers.Dense(64, activation="relu")(h)
+
+        outputs = layers.Dense(horizon)(h)  # ✅ multi-step
 
         return Model([past_input, future_input], outputs)
 
     else:
-        outputs = layers.Dense(horizon)(x)
+        outputs = layers.Dense(horizon)(x)  # ✅ multi-step
         return Model(past_input, outputs)
