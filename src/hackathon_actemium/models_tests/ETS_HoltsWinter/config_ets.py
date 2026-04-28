@@ -1,8 +1,8 @@
 MODEL_TYPE = "ets"
 
-SEASONALITY = 12
+SEASONALITY = 10
 
-TREND = "add"
-SEASONAL = "add"
+TREND = None
+SEASONAL = None
 
 TYPE_PRODUIT = False
