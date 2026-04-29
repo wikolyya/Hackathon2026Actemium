@@ -4,6 +4,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 
 def save_params(params: dict, path: Path = BASE_DIR / "artefacts" / "best_params.json"):
+    """
+    Fonction qui sauvegarde les paramètres du modèle dans un fichier JSON.
+    Args:
+        params (dict): Paramètres du modèle.
+        path (Path): Chemin du fichier de sortie.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)  # crée le dossier si besoin
 
@@ -12,6 +18,13 @@ def save_params(params: dict, path: Path = BASE_DIR / "artefacts" / "best_params
 
 
 def load_params(path: Path = BASE_DIR / "artefacts" / "best_params.json") -> dict:
+    """
+    Fonction qui charge les paramètres du modèle depuis un fichier JSON.
+    Args:
+        path (Path): Chemin du fichier JSON.
+    Returns:
+        dict: Paramètres du modèle.
+    """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Fichier introuvable : {path}")
@@ -21,6 +34,12 @@ def load_params(path: Path = BASE_DIR / "artefacts" / "best_params.json") -> dic
 
 
 def save_metrics(metrics: dict, path: Path = BASE_DIR / "artefacts" / "metrics.json"):
+    """
+    Fonction qui sauvegarde les métriques du modèle dans un fichier JSON.
+    Args:
+        metrics (dict): Métriques du modèle.
+        path (Path): Chemin du fichier de sortie.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
