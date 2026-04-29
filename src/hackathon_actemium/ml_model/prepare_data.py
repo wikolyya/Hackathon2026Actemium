@@ -3,9 +3,6 @@ import pandas as pd
 
 # WADI est une dataset temporelle, dans la préparation de mes données, il faut donc que je gère le côté temporel
 
-# TODO : revoir si on fait la fonction build_datetime, mais impossible pour le moment 
-# de gérer sans nettoyage des données.
-
 def add_temporal_features(df: pd.DataFrame, target: str) -> pd.DataFrame:
     """
     Ajoute des caractéristiques temporelles au DataFrame.
@@ -23,7 +20,7 @@ def add_temporal_features(df: pd.DataFrame, target: str) -> pd.DataFrame:
     for window in ROLLING_WINDOWS:
         # Calcul de la mean ert std sur une fenêtre glissante, pour avoir une tendance de la série temporelle
         df[f"{target}_rolling_mean_{window}s"] = df[target].shift(1).rolling(window=window).mean() # shift(1) pour éviter la fuite de données
-        df[f"{target}_rolling_std_{window}s"] = df[target].shift(1).rolling(window=window).std() 
+        df[f"{target}_rolling_std_{window}s"] = df[target].shift(1).rolling(window=window).std()   
 
     return df
 
@@ -93,7 +90,7 @@ def load_dataset(df:pd.DataFrame, target:str):
     df_train, df_valid, df_test = temporal_split(df)
  
     # 5) Séparation features / cible
-    X_train = df_train.drop(columns=[target])
+    X_train = df_train.drop(columns=[target])  # les features sont toutes les colonnes sauf la cible
     y_train = df_train[target]
  
     X_valid = df_valid.drop(columns=[target])

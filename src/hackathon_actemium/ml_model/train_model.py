@@ -14,6 +14,7 @@ def train_model(X_train, y_train, X_valid, y_valid, params):
         xgb.Booster: Modèle entraîné.
     """
 
+    # Convertion des données en fromat DMatrix, format optimisé pour XGBoost
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dvalid = xgb.DMatrix(X_valid, label=y_valid)
 
