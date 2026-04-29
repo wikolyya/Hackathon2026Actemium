@@ -1,10 +1,14 @@
-from .baseline import PersistenceBaseline
+from .arima_model import AutoARIMABaseline, StatsmodelsARIMABaseline
+from .baseline import ARIMABaseline, PersistenceBaseline
 from .kalman import KalmanLevelFilter
 from .linear_local import RegimeLocalLinearRegressor
 from .xgb_model import XGBTimeSeriesRegressor
 
 __all__ = [
     "PersistenceBaseline",
+    "ARIMABaseline",
+    "StatsmodelsARIMABaseline",
+    "AutoARIMABaseline",
     "KalmanLevelFilter",
     "RegimeLocalLinearRegressor",
     "XGBTimeSeriesRegressor",

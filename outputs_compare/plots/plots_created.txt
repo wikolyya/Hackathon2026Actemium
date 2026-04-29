@@ -1,0 +1,10 @@
+metrics_rmse_mae.png
+skill_vs_persistence.png
+modeles_tabular_predictions_vs_true.png
+modeles_tabular_residuals.png
+modeles_tabular_predicted_vs_actual.png
+modeles_tabular_top_errors.png
+kalman_predictions_vs_true.png
+kalman_residuals.png
+kalman_predicted_vs_actual.png
+kalman_top_errors.png

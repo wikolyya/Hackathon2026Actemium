@@ -14,15 +14,21 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
 try:
+    from .arima_model import AutoARIMABaseline, StatsmodelsARIMABaseline
+    from .baseline import ARIMABaseline
     from .kalman import KalmanLevelFilter
     from .linear_local import RegimeLocalLinearRegressor
+    from .visualization import generate_diagnostic_plots
     from .xgb_model import XGBTimeSeriesRegressor
 except ImportError:
     # Allows: python src/hackathon_actemium/models_tests/main_compare.py
     CURRENT_DIR = Path(__file__).resolve().parent
     sys.path.insert(0, str(CURRENT_DIR))
+    from arima_model import AutoARIMABaseline, StatsmodelsARIMABaseline
+    from baseline import ARIMABaseline
     from kalman import KalmanLevelFilter
     from linear_local import RegimeLocalLinearRegressor
+    from visualization import generate_diagnostic_plots
     from xgb_model import XGBTimeSeriesRegressor
 
 
@@ -220,9 +226,15 @@ def compare_tabular_models(
     ds: pd.DataFrame,
     feature_names: List[str],
     target_col: str,
+    horizon: int,
     results: List[Dict],
     outdir: Path,
     save_models: bool,
+    skip_arima: bool,
+    include_auto_arima: bool,
+    arima_order: tuple[int, int, int],
+    arima_max_train_samples: int | None,
+    arima_mode: str,
 ):
     train_idx, _, test_idx = time_split_indices(len(ds))
     train_df, test_df = ds.iloc[train_idx], ds.iloc[test_idx]
@@ -234,6 +246,40 @@ def compare_tabular_models(
 
     persistence_pred = test_df[target_col].values
     results.append(evaluate_predictions("baseline_persistence", y_test, persistence_pred, persistence_pred))
+
+    current_series = ds[target_col].values
+    extra_preds = {}
+
+    if not skip_arima:
+        try:
+            arima = StatsmodelsARIMABaseline(
+                order=arima_order,
+                max_train_samples=arima_max_train_samples,
+                prediction_mode=arima_mode,
+            )
+            arima.fit(current_series[: train_idx.stop], horizon=horizon)
+            arima_pred = arima.predict_from_series(current_series, test_idx.start, test_idx.stop)
+            extra_preds["arima"] = arima_pred
+            results.append(evaluate_predictions("arima", y_test, arima_pred, persistence_pred))
+        except Exception as exc:
+            print(f"ARIMA statsmodels ignore: {exc}")
+            arima_like = ARIMABaseline(lag_order=20, difference_order=1, alpha=1.0)
+            arima_like.fit(current_series[: train_idx.stop], horizon=horizon)
+            arima_like_pred = arima_like.predict_from_series(current_series, test_idx.start, test_idx.stop)
+            extra_preds["arima_like_baseline"] = arima_like_pred
+            results.append(evaluate_predictions("arima_like_baseline", y_test, arima_like_pred, persistence_pred))
+
+    if include_auto_arima:
+        try:
+            auto_arima = AutoARIMABaseline(max_train_samples=arima_max_train_samples)
+            auto_arima.fit(current_series[: train_idx.stop], horizon=horizon)
+            auto_arima_pred = auto_arima.predict_from_series(current_series, test_idx.start, test_idx.stop)
+            extra_preds["auto_arima"] = auto_arima_pred
+            metrics = evaluate_predictions("auto_arima", y_test, auto_arima_pred, persistence_pred)
+            metrics["order"] = str(auto_arima.order_)
+            results.append(metrics)
+        except Exception as exc:
+            print(f"Auto-ARIMA ignore: {exc}")
 
     xgb = XGBTimeSeriesRegressor(n_estimators=120, max_depth=4, learning_rate=0.05)
     xgb.fit(X_train, y_train)
@@ -251,6 +297,7 @@ def compare_tabular_models(
             "baseline_persistence": persistence_pred,
             "xgboost": xgb_pred,
             "linear_local": local_pred,
+            **extra_preds,
         }
     )
     preds_df.to_csv(outdir / "predictions_tabular.csv", index=False)
@@ -362,6 +409,32 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--skip-deep", action="store_true", help="Ignore GRU/LSTM/TCN/Transformer.")
     parser.add_argument("--skip-kalman", action="store_true", help="Ignore le filtre de Kalman.")
+    parser.add_argument("--skip-arima", action="store_true", help="Ignore le vrai modele ARIMA statsmodels.")
+    parser.add_argument(
+        "--include-auto-arima",
+        action="store_true",
+        help="Ajoute pmdarima.auto_arima. Plus lent, a tester d'abord avec --nrows.",
+    )
+    parser.add_argument("--arima-order", type=int, nargs=3, default=[5, 1, 0], metavar=("P", "D", "Q"))
+    parser.add_argument(
+        "--arima-max-train-samples",
+        type=int,
+        default=30000,
+        help="Nombre max de points train utilises par ARIMA/auto-ARIMA. 0 = tout utiliser.",
+    )
+    parser.add_argument(
+        "--arima-mode",
+        choices=["dynamic", "rolling"],
+        default="dynamic",
+        help="dynamic est rapide; rolling met a jour avec les observations mais peut etre tres lent.",
+    )
+    parser.add_argument("--skip-plots", action="store_true", help="Ne genere pas les graphiques PNG.")
+    parser.add_argument(
+        "--plot-samples",
+        type=int,
+        default=2000,
+        help="Nombre max de points affiches dans les courbes pour garder les PNG lisibles.",
+    )
     parser.add_argument("--save-models", action="store_true", help="Sauvegarde les modeles tabulaires entraines.")
     return parser.parse_args()
 
@@ -391,9 +464,23 @@ def main():
     print(f"Features retenues ({len(feature_cols)}): {feature_cols}")
 
     results: List[Dict] = []
+    arima_max_train_samples = None if args.arima_max_train_samples == 0 else args.arima_max_train_samples
 
     ds_tab, feature_names = build_tabular_dataset(df, target_col, feature_cols, args.lags, args.horizon)
-    compare_tabular_models(ds_tab, feature_names, target_col, results, outdir, args.save_models)
+    compare_tabular_models(
+        ds_tab,
+        feature_names,
+        target_col,
+        args.horizon,
+        results,
+        outdir,
+        args.save_models,
+        args.skip_arima,
+        args.include_auto_arima,
+        tuple(args.arima_order),
+        arima_max_train_samples,
+        args.arima_mode,
+    )
 
     if not args.skip_deep:
         X_seq, y_seq, persistence_seq = build_sequence_dataset(
@@ -412,6 +499,12 @@ def main():
     print("\n=== Comparaison des modeles ===")
     print(results_df.to_string(index=False))
     print(f"\nResultats sauvegardes dans: {outdir.resolve()}")
+
+    if not args.skip_plots:
+        plot_paths = generate_diagnostic_plots(outdir, max_points=args.plot_samples)
+        print(f"Graphiques sauvegardes dans: {(outdir / 'plots').resolve()}")
+        for path in plot_paths:
+            print(f"- {path.name}")
 
 
 if __name__ == "__main__":
