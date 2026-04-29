@@ -1,86 +1,156 @@
 from __future__ import annotations
+
 import argparse
+import importlib
 import json
-import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
-from hackathon_actemium.models_tests import (
-    PersistenceBaseline,
-    XGBTimeSeriesRegressor,
-    RegimeLocalLinearRegressor,
-    GRURegressor,
-    LSTMRegressor,
-    TCNRegressor,
-    TemporalTransformerRegressor,
-    KalmanLevelFilter,
-)
+try:
+    from .kalman import KalmanLevelFilter
+    from .linear_local import RegimeLocalLinearRegressor
+    from .xgb_model import XGBTimeSeriesRegressor
+except ImportError:
+    # Allows: python src/hackathon_actemium/models_tests/main_compare.py
+    CURRENT_DIR = Path(__file__).resolve().parent
+    sys.path.insert(0, str(CURRENT_DIR))
+    from kalman import KalmanLevelFilter
+    from linear_local import RegimeLocalLinearRegressor
+    from xgb_model import XGBTimeSeriesRegressor
 
 
-def rmse(y_true, y_pred):
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CSV = PROJECT_ROOT / "src" / "hackathon_actemium" / "stats" / "WADI_14days_new.csv"
+DEFAULT_TARGET = "1_LT_001_PV"
+DEFAULT_HORIZON = 600
+
+
+def resolve_csv_path(csv_arg: str | None) -> Path:
+    candidates = []
+    if csv_arg:
+        given = Path(csv_arg).expanduser()
+        candidates.extend([given, PROJECT_ROOT / given])
+    candidates.append(DEFAULT_CSV)
+
+    for path in candidates:
+        if path.exists():
+            return path.resolve()
+
+    checked = "\n".join(f"- {path}" for path in candidates)
+    raise FileNotFoundError(f"CSV introuvable. Chemins testes:\n{checked}")
+
+
+def load_sequence_regressors():
+    """Load Torch regressors lazily so tabular tests work without torch."""
+    try:
+        if __package__:
+            package = __package__
+            gru_module = importlib.import_module(".gru_model", package)
+            lstm_module = importlib.import_module(".lstm_model", package)
+            tcn_module = importlib.import_module(".tcn_model", package)
+            transformer_module = importlib.import_module(".temporal_transformer", package)
+        else:
+            src_dir = Path(__file__).resolve().parents[2]
+            if str(src_dir) not in sys.path:
+                sys.path.insert(0, str(src_dir))
+            package = "hackathon_actemium.models_tests"
+            gru_module = importlib.import_module(f"{package}.gru_model")
+            lstm_module = importlib.import_module(f"{package}.lstm_model")
+            tcn_module = importlib.import_module(f"{package}.tcn_model")
+            transformer_module = importlib.import_module(f"{package}.temporal_transformer")
+
+        return {
+            "gru": gru_module.GRURegressor,
+            "lstm": lstm_module.LSTMRegressor,
+            "tcn": tcn_module.TCNRegressor,
+            "temporal_transformer": transformer_module.TemporalTransformerRegressor,
+        }, None
+    except Exception as exc:  # pragma: no cover - depends on the local env
+        return {}, exc
+
+
+def rmse(y_true, y_pred) -> float:
     return float(np.sqrt(mean_squared_error(y_true, y_pred)))
+
+
+def safe_mape(y_true, y_pred) -> float:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    mask = np.abs(y_true) > 1e-12
+    if not mask.any():
+        return float("nan")
+    return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100.0)
 
 
 def infer_target_column(df: pd.DataFrame, target: str | None = None) -> str:
     if target and target in df.columns:
         return target
-    lt_candidates = [c for c in df.columns if 'LT' in c and ('PV' in c or 'VALUE' in c.upper())]
+    if DEFAULT_TARGET in df.columns:
+        return DEFAULT_TARGET
+    lt_candidates = [c for c in df.columns if "LT" in c and ("PV" in c or "VALUE" in c.upper())]
     if lt_candidates:
         return lt_candidates[0]
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if not numeric_cols:
-        raise ValueError('Aucune colonne numérique trouvée pour la target.')
+        raise ValueError("Aucune colonne numerique trouvee pour la target.")
     return numeric_cols[0]
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
-    time_candidates = [c for c in df.columns if c.lower() in {'timestamp', 'time', 'datetime', 'date'}]
+
+    time_candidates = [c for c in df.columns if c.lower() in {"timestamp", "time", "datetime", "date"}]
     if time_candidates:
         c = time_candidates[0]
-        try:
-            df[c] = pd.to_datetime(df[c], errors='coerce')
+        parsed = pd.to_datetime(df[c], errors="coerce")
+        if parsed.notna().mean() > 0.8:
+            df[c] = parsed
             df = df.sort_values(c).reset_index(drop=True)
-        except Exception:
-            pass
+
     for c in df.columns:
-        if df[c].dtype == 'object':
-            coerced = pd.to_numeric(df[c], errors='coerce')
+        if df[c].dtype == "object":
+            coerced = pd.to_numeric(df[c], errors="coerce")
             if coerced.notna().mean() > 0.8:
                 df[c] = coerced
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     df = df[numeric_cols].copy()
     df = df.replace([np.inf, -np.inf], np.nan)
-    df = df.ffill().bfill().dropna(axis=1, how='all')
+    df = df.ffill().bfill().dropna(axis=1, how="all")
     return df
 
 
-def select_features(df: pd.DataFrame, target_col: str, max_features: int = 10) -> List[str]:
-    candidates = [c for c in df.columns if c != target_col]
+def select_features(df: pd.DataFrame, target_col: str, max_features: int = 12) -> List[str]:
+    candidates = [c for c in df.columns if c != target_col and c.lower() != "row"]
     if len(candidates) <= max_features:
         return candidates
-    corrs = {}
+
     y = df[target_col]
+    corrs = {}
     for c in candidates:
         try:
-            corrs[c] = abs(df[c].corr(y))
+            corr = df[c].corr(y)
+            corrs[c] = 0.0 if pd.isna(corr) else abs(float(corr))
         except Exception:
             corrs[c] = 0.0
-    ordered = sorted(candidates, key=lambda c: (corrs.get(c, 0.0), c), reverse=True)
-    return ordered[:max_features]
+    return sorted(candidates, key=lambda c: (corrs.get(c, 0.0), c), reverse=True)[:max_features]
 
 
 def add_lags(df: pd.DataFrame, cols: List[str], lags: List[int]) -> pd.DataFrame:
     out = df.copy()
     for c in cols:
-        for lag in lags:
-            out[f'{c}_lag{lag}'] = out[c].shift(lag)
+        for lag in sorted(set(lags)):
+            if lag <= 0:
+                continue
+            out[f"{c}_lag{lag}"] = out[c].shift(lag)
     return out
 
 
@@ -89,11 +159,12 @@ def build_tabular_dataset(
     target_col: str,
     feature_cols: List[str],
     lags: List[int],
+    horizon: int,
 ) -> Tuple[pd.DataFrame, List[str]]:
-    lag_source_cols = [target_col] + feature_cols
-    ds = add_lags(df[[target_col] + feature_cols], lag_source_cols, lags)
-    ds['target'] = ds[target_col]
-    feature_names = [c for c in ds.columns if c not in {target_col, 'target'}]
+    use_cols = [target_col] + feature_cols
+    ds = add_lags(df[use_cols], use_cols, lags)
+    ds["y_future"] = df[target_col].shift(-horizon)
+    feature_names = [c for c in ds.columns if c != "y_future"]
     ds = ds.dropna().reset_index(drop=True)
     return ds, feature_names
 
@@ -103,72 +174,112 @@ def build_sequence_dataset(
     target_col: str,
     feature_cols: List[str],
     seq_len: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+    horizon: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     use_cols = [target_col] + feature_cols
     values = df[use_cols].values.astype(np.float32)
-    X, y = [], []
-    for i in range(seq_len, len(values)):
-        X.append(values[i-seq_len:i])
-        y.append(values[i, 0])
-    return np.asarray(X), np.asarray(y)
+    target_values = df[target_col].values.astype(np.float32)
+    X, y, persistence = [], [], []
+
+    last_origin = len(values) - horizon
+    for origin in range(seq_len - 1, last_origin):
+        X.append(values[origin - seq_len + 1 : origin + 1])
+        y.append(target_values[origin + horizon])
+        persistence.append(target_values[origin])
+
+    return np.asarray(X), np.asarray(y), np.asarray(persistence)
 
 
 def time_split_indices(n: int, train_ratio=0.7, val_ratio=0.15):
+    if n < 10:
+        raise ValueError(f"Jeu de donnees trop petit apres preparation: {n} lignes.")
     train_end = int(n * train_ratio)
     val_end = int(n * (train_ratio + val_ratio))
     return slice(0, train_end), slice(train_end, val_end), slice(val_end, n)
 
 
-def evaluate_model(name: str, y_true, y_pred, persistence_rmse: float | None = None):
+def evaluate_predictions(name: str, y_true, y_pred, persistence_pred=None) -> Dict:
     metrics = {
-        'model': name,
-        'rmse': rmse(y_true, y_pred),
-        'mae': float(mean_absolute_error(y_true, y_pred)),
+        "model": name,
+        "mae": float(mean_absolute_error(y_true, y_pred)),
+        "rmse": rmse(y_true, y_pred),
+        "mse": float(mean_squared_error(y_true, y_pred)),
+        "mape": safe_mape(y_true, y_pred),
+        "r2": float(r2_score(y_true, y_pred)),
     }
-    if persistence_rmse is not None and persistence_rmse > 0:
-        metrics['skill_vs_persistence'] = 1.0 - (metrics['rmse'] / persistence_rmse)
+    if persistence_pred is not None:
+        persistence_rmse = rmse(y_true, persistence_pred)
+        metrics["persistence_rmse"] = persistence_rmse
+        metrics["skill_vs_persistence"] = (
+            float(1.0 - metrics["rmse"] / persistence_rmse) if persistence_rmse > 0 else float("nan")
+        )
     return metrics
 
 
-def compare_tabular_models(ds: pd.DataFrame, feature_names: List[str], results: List[Dict], outdir: Path):
-    train_idx, val_idx, test_idx = time_split_indices(len(ds))
-    train_df, val_df, test_df = ds.iloc[train_idx], ds.iloc[val_idx], ds.iloc[test_idx]
+def compare_tabular_models(
+    ds: pd.DataFrame,
+    feature_names: List[str],
+    target_col: str,
+    results: List[Dict],
+    outdir: Path,
+    save_models: bool,
+):
+    train_idx, _, test_idx = time_split_indices(len(ds))
+    train_df, test_df = ds.iloc[train_idx], ds.iloc[test_idx]
 
     X_train = train_df[feature_names].values
-    y_train = train_df['target'].values
+    y_train = train_df["y_future"].values
     X_test = test_df[feature_names].values
-    y_test = test_df['target'].values
+    y_test = test_df["y_future"].values
 
-    baseline = PersistenceBaseline().fit(X_train, y_train)
-    baseline_pred = baseline.predict(X_test)
-    baseline_metrics = evaluate_model('baseline_persistence', y_test, baseline_pred)
-    results.append(baseline_metrics)
-    persistence_rmse = baseline_metrics['rmse']
+    persistence_pred = test_df[target_col].values
+    results.append(evaluate_predictions("baseline_persistence", y_test, persistence_pred, persistence_pred))
 
-    xgb = XGBTimeSeriesRegressor()
+    xgb = XGBTimeSeriesRegressor(n_estimators=120, max_depth=4, learning_rate=0.05)
     xgb.fit(X_train, y_train)
     xgb_pred = xgb.predict(X_test)
-    results.append(evaluate_model('xgboost', y_test, xgb_pred, persistence_rmse))
+    results.append(evaluate_predictions("xgboost", y_test, xgb_pred, persistence_pred))
 
     linear_local = RegimeLocalLinearRegressor(n_regimes=3, alpha=1.0)
     linear_local.fit(X_train, y_train)
     local_pred = linear_local.predict(X_test)
-    results.append(evaluate_model('linear_local', y_test, local_pred, persistence_rmse))
+    results.append(evaluate_predictions("linear_local", y_test, local_pred, persistence_pred))
 
-    preds_df = pd.DataFrame({
-        'y_true': y_test,
-        'baseline_persistence': baseline_pred,
-        'xgboost': xgb_pred,
-        'linear_local': local_pred,
-    })
-    preds_df.to_csv(outdir / 'predictions_tabular.csv', index=False)
-    return persistence_rmse
+    preds_df = pd.DataFrame(
+        {
+            "y_true": y_test,
+            "baseline_persistence": persistence_pred,
+            "xgboost": xgb_pred,
+            "linear_local": local_pred,
+        }
+    )
+    preds_df.to_csv(outdir / "predictions_tabular.csv", index=False)
+
+    if save_models:
+        models_dir = outdir / "saved_models"
+        models_dir.mkdir(parents=True, exist_ok=True)
+        joblib.dump({"model": xgb.model, "features": feature_names}, models_dir / "xgboost.joblib")
+        joblib.dump({"model": linear_local, "features": feature_names}, models_dir / "linear_local.joblib")
 
 
-def compare_sequence_models(X_seq, y_seq, results: List[Dict], persistence_rmse: float, outdir: Path):
-    train_idx, val_idx, test_idx = time_split_indices(len(X_seq))
+def compare_sequence_models(
+    X_seq,
+    y_seq,
+    persistence_seq,
+    results: List[Dict],
+    outdir: Path,
+    epochs: int,
+    batch_size: int,
+):
+    sequence_regressors, import_error = load_sequence_regressors()
+    if import_error is not None:
+        print(f"Modeles deep learning ignores: torch/import indisponible ({import_error}).")
+        return
+
+    train_idx, _, test_idx = time_split_indices(len(X_seq))
     X_train, y_train = X_seq[train_idx], y_seq[train_idx]
     X_test, y_test = X_seq[test_idx], y_seq[test_idx]
+    persistence_pred = persistence_seq[test_idx]
 
     scaler = StandardScaler()
     n_features = X_train.shape[-1]
@@ -179,83 +290,129 @@ def compare_sequence_models(X_seq, y_seq, results: List[Dict], persistence_rmse:
     X_test = scaler.transform(X_test_2d).reshape(X_test.shape)
 
     models = {
-        'gru': GRURegressor(epochs=10, batch_size=64),
-        'lstm': LSTMRegressor(epochs=10, batch_size=64),
-        'tcn': TCNRegressor(epochs=10, batch_size=64),
-        'temporal_transformer': TemporalTransformerRegressor(epochs=10, batch_size=64),
+        name: regressor_cls(epochs=epochs, batch_size=batch_size)
+        for name, regressor_cls in sequence_regressors.items()
     }
 
-    preds = {'y_true': y_test}
+    preds = {"y_true": y_test, "baseline_persistence": persistence_pred}
     for name, model in models.items():
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
         preds[name] = y_pred
-        results.append(evaluate_model(name, y_test, y_pred, persistence_rmse))
+        results.append(evaluate_predictions(name, y_test, y_pred, persistence_pred))
 
-    pd.DataFrame(preds).to_csv(outdir / 'predictions_dl.csv', index=False)
+    pd.DataFrame(preds).to_csv(outdir / "predictions_dl.csv", index=False)
 
 
-def compare_kalman(y_train, y_test, results: List[Dict], persistence_rmse: float, outdir: Path):
+def compare_kalman(
+    df: pd.DataFrame,
+    target_col: str,
+    horizon: int,
+    results: List[Dict],
+    outdir: Path,
+):
+    y = df[target_col].values.astype(float)
+    origins = np.arange(0, len(y) - horizon)
+    train_idx, _, test_idx = time_split_indices(len(origins))
+    train_origins = origins[train_idx]
+    test_origins = origins[test_idx]
+
     kf = KalmanLevelFilter(dt=1.0, q_level=1e-4, q_slope=1e-5, r_measure=1e-2)
-    kf.fit(y_train)
-    _ = kf.filter(y_train)
-    preds = []
-    if kf.x_ is None:
-        raise RuntimeError("KalmanLevelFilter non initialisé après fit().")
-    current = kf.x_.copy()
-    for obs in y_test:
-        pred = kf.predict_next(1)[0]
-        preds.append(pred)
-        kf.filter(np.array([obs]))
+    last_train_origin = int(train_origins[-1])
+    kf.fit(y[: last_train_origin + 1])
+    kf.filter(y[: last_train_origin + 1])
+
+    preds, y_true, persistence = [], [], []
+    last_filtered = last_train_origin
+    for origin in test_origins:
+        if origin > last_filtered:
+            kf.filter(y[last_filtered + 1 : origin + 1])
+            last_filtered = int(origin)
+        preds.append(kf.predict_next(horizon)[-1])
+        y_true.append(y[origin + horizon])
+        persistence.append(y[origin])
+
     preds = np.asarray(preds)
-    results.append(evaluate_model('kalman', y_test, preds, persistence_rmse))
-    pd.DataFrame({'y_true': y_test, 'kalman': preds}).to_csv(outdir / 'predictions_kalman.csv', index=False)
+    y_true = np.asarray(y_true)
+    persistence = np.asarray(persistence)
+    results.append(evaluate_predictions("kalman", y_true, preds, persistence))
+    pd.DataFrame({"y_true": y_true, "baseline_persistence": persistence, "kalman": preds}).to_csv(
+        outdir / "predictions_kalman.csv", index=False
+    )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Compare les modeles WADI avec MAE, RMSE et skill vs persistence."
+    )
+    parser.add_argument("--csv", type=str, default=None, help="Chemin vers le CSV WADI.")
+    parser.add_argument("--target", type=str, default=DEFAULT_TARGET, help="Colonne cible.")
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=DEFAULT_HORIZON,
+        help="Nombre de pas a predire dans le futur. 600 = 10 min si frequence 1 Hz.",
+    )
+    parser.add_argument("--lags", type=int, nargs="+", default=[1, 10, 60, 300, 600])
+    parser.add_argument("--seq-len", type=int, default=60)
+    parser.add_argument("--max-features", type=int, default=12)
+    parser.add_argument("--nrows", type=int, default=None, help="Mode test rapide: ne lit que les N premieres lignes.")
+    parser.add_argument("--outdir", type=str, default=str(PROJECT_ROOT / "outputs_compare"))
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--skip-deep", action="store_true", help="Ignore GRU/LSTM/TCN/Transformer.")
+    parser.add_argument("--skip-kalman", action="store_true", help="Ignore le filtre de Kalman.")
+    parser.add_argument("--save-models", action="store_true", help="Sauvegarde les modeles tabulaires entraines.")
+    return parser.parse_args()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compare plusieurs modèles WADI sur une même cible.')
-    parser.add_argument('--csv', type=str, required=True, help='Chemin vers le CSV.')
-    parser.add_argument('--target', type=str, default=None, help='Nom de la colonne cible.')
-    parser.add_argument('--lags', type=int, nargs='+', default=[1, 3, 5, 10, 15])
-    parser.add_argument('--seq-len', type=int, default=15)
-    parser.add_argument('--max-features', type=int, default=10)
-    parser.add_argument('--outdir', type=str, default='outputs_compare')
-    args = parser.parse_args()
-
-    outdir = Path(args.outdir)
+    args = parse_args()
+    outdir = Path(args.outdir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    df_raw = pd.read_csv(args.csv)
+    csv_path = resolve_csv_path(args.csv)
+    print(f"CSV: {csv_path}")
+    print(f"Horizon: {args.horizon} pas")
+
+    df_raw = pd.read_csv(csv_path, nrows=args.nrows)
     df = clean_dataframe(df_raw)
     target_col = infer_target_column(df, args.target)
-    feature_cols = select_features(df, target_col, max_features=args.max_features)
+    if target_col not in df.columns:
+        raise ValueError(f"Target introuvable apres nettoyage: {target_col}")
+    if len(df) <= args.horizon + max(args.lags, default=0) + args.seq_len:
+        raise ValueError(
+            "Pas assez de lignes pour cet horizon/ces lags. "
+            "Augmente --nrows ou diminue --horizon/--lags/--seq-len."
+        )
 
-    print(f'Target: {target_col}')
-    print(f'Features retenues ({len(feature_cols)}): {feature_cols}')
+    feature_cols = select_features(df, target_col, max_features=args.max_features)
+    print(f"Target: {target_col}")
+    print(f"Features retenues ({len(feature_cols)}): {feature_cols}")
 
     results: List[Dict] = []
 
-    ds_tab, feature_names = build_tabular_dataset(df, target_col, feature_cols, args.lags)
-    persistence_rmse = compare_tabular_models(ds_tab, feature_names, results, outdir)
+    ds_tab, feature_names = build_tabular_dataset(df, target_col, feature_cols, args.lags, args.horizon)
+    compare_tabular_models(ds_tab, feature_names, target_col, results, outdir, args.save_models)
 
-    X_seq, y_seq = build_sequence_dataset(df[[target_col] + feature_cols], target_col, feature_cols, args.seq_len)
-    compare_sequence_models(X_seq, y_seq, results, persistence_rmse, outdir)
+    if not args.skip_deep:
+        X_seq, y_seq, persistence_seq = build_sequence_dataset(
+            df[[target_col] + feature_cols], target_col, feature_cols, args.seq_len, args.horizon
+        )
+        compare_sequence_models(X_seq, y_seq, persistence_seq, results, outdir, args.epochs, args.batch_size)
 
-    split_train, _, split_test = time_split_indices(len(df))
-    y_train = df[target_col].values[split_train]
-    y_test = df[target_col].values[split_test]
-    compare_kalman(y_train, y_test, results, persistence_rmse, outdir)
+    if not args.skip_kalman:
+        compare_kalman(df, target_col, args.horizon, results, outdir)
 
-    results_df = pd.DataFrame(results).sort_values('rmse').reset_index(drop=True)
-    results_df.to_csv(outdir / 'model_comparison.csv', index=False)
-    with open(outdir / 'summary.json', 'w', encoding='utf-8') as f:
+    results_df = pd.DataFrame(results).sort_values("rmse").reset_index(drop=True)
+    results_df.to_csv(outdir / "model_comparison.csv", index=False)
+    with open(outdir / "summary.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
-    print('\n=== Comparaison des modèles ===')
+    print("\n=== Comparaison des modeles ===")
     print(results_df.to_string(index=False))
-    print(f'\nRésultats sauvegardés dans: {outdir.resolve()}')
+    print(f"\nResultats sauvegardes dans: {outdir.resolve()}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-# commande d'execution: PYTHONPATH=src python -m hackathon_actemium.models_tests.main_compare --csv src/hackathon_actemium/stats/WADI_14days_new.csv
