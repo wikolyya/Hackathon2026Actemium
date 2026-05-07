@@ -28,4 +28,4 @@ FORCE_TUNING = False # False car on réutilise les best_params.json si existant
 # Paramètres pour les features temporelles
 
 LAG_STEPS = [1, 5, 10, 30, 60]           #lags en secondes
-ROLLING_WINDOWS = [10, 30, 60]          #fenêtres glissantes en secondes     
+ROLLING_WINDOWS = [10, 30, 60]           #fenêtres glissantes en secondes--     
