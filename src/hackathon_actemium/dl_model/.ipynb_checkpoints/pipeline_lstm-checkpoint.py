@@ -19,4 +19,10 @@ class LSTMWrapper:
 
     def predict(self, X_last, n_steps):
 
-        return self.forecaster(model=self.result[0], val=X_last, scaler=self.result[1], saisonalite=self.config["seq_len"], n_steps=n_steps)
+        return self.forecaster(
+            model=self.result[0],
+            val=X_last,
+            scaler=self.result[1],
+            saisonalite=self.config["WINDOW_SIZE"],
+            n_steps=n_steps
+        )

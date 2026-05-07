@@ -31,12 +31,12 @@ def build_tcn(
     n_past_features,
     horizon=1,
     n_future_features=0,
-    channels=(32, 64),
+    channels = (16, 32),
     kernel_size=3,
     dropout=0.1
 ):
 
-    # ===== PAST =====
+    # PASSE
     past_input = layers.Input(shape=(seq_len, n_past_features))
     x = past_input
 
@@ -45,14 +45,14 @@ def build_tcn(
             x, ch, kernel_size, dilation=2**i, dropout=dropout
         )
 
-    # 👉 on garde uniquement le dernier timestep
+    # on garde uniquement le dernier timestep
     x = layers.Lambda(lambda t: t[:, -1, :])(x)
 
-    # 👉 petit MLP pour stabiliser (important en multi-step)
+    # petit MLP pour stabiliser (important en multi-step)
     x = layers.Dense(64, activation="relu")(x)
     x = layers.Dropout(dropout)(x)
 
-    # ===== FUTURE (OPTIONAL) =====
+    # FUTURE
     if n_future_features > 0:
 
         future_input = layers.Input(shape=(horizon, n_future_features))
@@ -63,10 +63,10 @@ def build_tcn(
         h = layers.Concatenate()([x, f])
         h = layers.Dense(64, activation="relu")(h)
 
-        outputs = layers.Dense(horizon)(h)  # ✅ multi-step
+        outputs = layers.Dense(horizon)(h)  # multi-step
 
         return Model([past_input, future_input], outputs)
 
     else:
-        outputs = layers.Dense(horizon)(x)  # ✅ multi-step
+        outputs = layers.Dense(horizon)(x)  # multi-step
         return Model(past_input, outputs)

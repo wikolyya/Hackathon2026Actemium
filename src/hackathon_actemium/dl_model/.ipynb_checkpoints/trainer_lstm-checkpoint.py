@@ -5,7 +5,7 @@ import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
-from .config_lstm import ARCHITECTURES, WINDOW_SIZE, BATCH, EPOCHS, VERBOSE, HORIZON
+from .config_lstm import ARCHITECTURES, BATCH, EPOCHS, VERBOSE, HORIZON
 from .architectures_lstm import build_lstm_model, build_bidirectionnal_lstm, build_gru_lstm
 from .sequences_lstm import prepare_sequences, prepare_sequences_multi
 
@@ -23,7 +23,7 @@ def get_device() -> str:
         print("Aucun GPU détecté. Utilisation du CPU pour l'entraînement.")
         return "CPU"
 
-def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size=BATCH, epochs=EPOCHS, verbose=VERBOSE):
+def train_lstm(X_train, y_train, X_valid, y_valid, WINDOW_SIZE, model_type="lstm", batch_size=BATCH, epochs=EPOCHS, verbose=VERBOSE):
     """
     Pipeline complet : normalisation → séquences → entraînement.
  
@@ -37,17 +37,18 @@ def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size
         tuple: (model, scaler, history)
     """
     # 1. Scaling
-    scaler = MinMaxScaler(feature_range=(0, 1))
-
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_valid_scaled = scaler.transform(X_valid)
-
-    y_train = y_train.values
-    y_valid = y_valid.values
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    
+    X_train_scaled = scaler_X.fit_transform(X_train)
+    X_valid_scaled = scaler_X.transform(X_valid)
+    
+    y_train_scaled = scaler_y.fit_transform(y_train.values.reshape(-1,1)).flatten()
+    y_valid_scaled = scaler_y.transform(y_valid.values.reshape(-1,1)).flatten()
 
     # 2. Séquences
-    X_train_seq, y_train_seq = prepare_sequences(X_train_scaled, y_train)
-    X_valid_seq, y_valid_seq = prepare_sequences(X_valid_scaled, y_valid)
+    X_train_seq, y_train_seq = prepare_sequences(X_train_scaled, y_train_scaled)
+    X_valid_seq, y_valid_seq = prepare_sequences(X_valid_scaled, y_valid_scaled)
 
     # reshape pour LSTM
     X_train_seq = X_train_seq.reshape((X_train_seq.shape[0], X_train_seq.shape[1], X_train_seq.shape[2]))
@@ -88,7 +89,7 @@ def train_lstm(X_train, y_train, X_valid, y_valid, model_type="lstm", batch_size
         verbose=verbose
     )
 
-    return model, scaler, history
+    return model, (scaler_X, scaler_y), history
 
 def train_lstm_multistep_direct(
     X_train: pd.DataFrame,
@@ -98,17 +99,18 @@ def train_lstm_multistep_direct(
     horizon: int = HORIZON,
     model_type: str = "lstm"
 ):
-    scaler = MinMaxScaler(feature_range=(0, 1))
-
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_valid_scaled = scaler.transform(X_valid)
-
-    y_train = y_train.values
-    y_valid = y_valid.values
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    
+    X_train_scaled = scaler_X.fit_transform(X_train)
+    X_valid_scaled = scaler_X.transform(X_valid)
+    
+    y_train_scaled = scaler_y.fit_transform(y_train.values.reshape(-1,1))
+    y_valid_scaled = scaler_y.transform(y_valid.values.reshape(-1,1))
 
     # Séquences multi-step
     X_train_seq, y_train_seq = prepare_sequences_multi(
-        X_train_scaled, y_train, WINDOW_SIZE, horizon
+        X_train_scaled, y_train_scaled, WINDOW_SIZE, horizon
     )
 
     X_valid_seq, y_valid_seq = prepare_sequences_multi(
@@ -148,4 +150,4 @@ def train_lstm_multistep_direct(
         shuffle=False
     )
 
-    return model, scaler, history
+    return model, (scaler_X, scaler_y), history

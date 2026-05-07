@@ -1,4 +1,7 @@
 import numpy as np
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+
 
 def forecast_arima(model, n_steps, model_type="arima", X_future=None, model_trend=None, season_pattern=None, saisonalite=12, min_train=None,
     n_train=None, type_produit=False):
@@ -11,9 +14,11 @@ def forecast_arima(model, n_steps, model_type="arima", X_future=None, model_tren
     """
 
     if "sarimax" in model_type:
-        pred = model.predict(n_periods=n_steps, X=X_future)
+        res = model.arima_res_
+        pred = res.forecast(steps=n_steps, exog=X_future)
     else:
-        pred = model.predict(n_periods=n_steps)
+        res = model.arima_res_
+        pred = res.forecast(steps=n_steps)
 
     # reconstruction STL
     if "stl" in model_type:

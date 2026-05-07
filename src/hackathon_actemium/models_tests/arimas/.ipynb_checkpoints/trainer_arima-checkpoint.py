@@ -34,13 +34,16 @@ def train_arima(y_train, y_val=None, X_train=None, X_val=None,
         y_train_model = y_train
         model_trend = None
         season_pattern = None
+    y_train_model.astype("float32")
 
     # modèle
     if model_type in ["arima", "stl_arima"]:
-        model = pm.auto_arima(y_train_model, seasonal=(model_type == "arima"), verbose=verbose, with_intercept=False)
+        model = pm.auto_arima(y_train_model, seasonal=(model_type == "arima"), verbose=verbose, with_intercept=False,
+    low_memory=True)
 
     elif model_type in ["sarimax", "stl_sarimax"]:
-        model = pm.auto_arima(y=y_train_model, X=X_train, seasonal=(model_type == "sarimax"), verbose=verbose, with_intercept=False)
+        model = pm.auto_arima(y=y_train_model, X=X_train, seasonal=(model_type == "sarimax"), verbose=verbose, with_intercept=False,
+    low_memory=True)
     else:
         raise ValueError("Modèle inconnu")
 

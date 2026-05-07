@@ -2,31 +2,29 @@ import numpy as np
 
 def forecast_lstm(model, val, scaler, saisonalite, n_steps):
 
-    # scaler comme dans l'entraînement
-    val_scaled = scaler.transform(val)
+    scaler_X, scaler_y = scaler
 
-    # dernière fenêtre
+    val_scaled = scaler_X.transform(val)
+    
     last_window = val_scaled[-saisonalite:]
-
+    
     preds = []
-
+    
     for _ in range(n_steps):
-
-        X = last_window.reshape(1, saisonalite, 1)
-
-        pred = model.predict(X, verbose=0)
-
-        preds.append(pred[0,0])
-
-        # mise à jour de la fenêtre
-        last_window = np.vstack([last_window[1:], pred])
-
+    
+        X = last_window.reshape(1, saisonalite, last_window.shape[1])
+    
+        pred = model.predict(X, verbose=0)[0,0]
+    
+        preds.append(pred)
+    
+        new_row = last_window[-1].copy()
+    
+        last_window = np.vstack([last_window[1:], new_row])
+    
     preds = np.array(preds).reshape(-1,1)
-
-    # retour à l'échelle originale
-    preds = scaler.inverse_transform(preds)
-
-    return preds
+    
+    return scaler_y.inverse_transform(preds)
 
 
 def forecast_lstm_direct(model, val, scaler, saisonalite):

@@ -7,7 +7,7 @@ MODEL_TYPES = [
 
 DEFAULT_MODEL = "arima"
 
-SEASONALITY = 12   # fixe comme tu veux
+SEASONALITY = 10   # fixe comme tu veux
 S_WINDOW = 7       # lissage STL (optionnel)
 
 TYPE_PRODUIT = False
