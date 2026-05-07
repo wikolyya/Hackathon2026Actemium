@@ -13,7 +13,6 @@ output-compare/
 ├── plots/
 └── summary.json
 src/hackathon_actemium/
-├── dl_model/
 ├── ml_model/
 └── models_tests/
 README.md
@@ -38,11 +37,11 @@ requirements.txt
    - Baseline naïve (persistence, moyenne)
    - Comparaison de modèles :
      - `XGBoost` — performant sur grands datasets tabulaires
-     - `Random Forest` — robuste sur petits volumes
-     - `LSTM` — adapté aux séquences temporelles
-     - `GRU` — alternative légère au LSTM
-     - `TCN` — convolutions causales pour séries temporelles
-     - `Temporal Transformer` — efficace avec variables exogènes
+     - `Random Forest` - robuste sur petits volumes
+     - `LSTM` - adapté aux séquences temporelles
+     - `GRU` - alternative légère au LSTM
+     - `TCN` - convolutions causales pour séries temporelles
+     - `Temporal Transformer` - efficace avec variables exogènes
 
 4. **Optimisation**
    - Tuning des hyperparamètres via **Optuna** (recherche bayésienne)
